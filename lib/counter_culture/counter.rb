@@ -25,6 +25,7 @@ module CounterCulture
     #   :counter_cache_name => the column name of the counter cache
     #   :counter_column => overrides :counter_cache_name
     #   :delta_column => override the default count delta (1) with the value of this column in the counted record
+    #   :delta_magnitude => override the default count delta (1) and ignore :delta_column
     #   :was => whether to get the current value or the old value of the
     #      first part of the relation
     #   :execute_after_commit => execute the column update outside of the transaction to avoid deadlocks
@@ -37,7 +38,9 @@ module CounterCulture
       id_to_change = foreign_key_values.call(id_to_change) if foreign_key_values
 
       if id_to_change && change_counter_column
-        delta_magnitude = if delta_column
+        delta_magnitude = if options.include?(:delta_magnitude)
+                            options[:delta_magnitude]
+                          elsif delta_column
                             delta_attr_name = options[:was] ? "#{delta_column}_was" : delta_column
                             obj.send(delta_attr_name) || 0
                           else
