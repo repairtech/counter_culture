@@ -24,14 +24,9 @@ ActiveRecord::Schema.define(:version => 20120522160158) do
     t.integer  "review_approvals_count",      :default => 0, :null => false
     t.integer  "parent_id"
     t.integer  "children_count",      :default => 0, :null => false
-    t.integer  "recruiters_count",    :default => 0, :null => false
+    t.integer  "soft_deletes_count",  :default => 0, :null => false
     t.datetime "created_at"
     t.datetime "updated_at"
-  end
-
-  create_table "company_access_levels", :force => true do |t|
-    t.integer "company_id"
-    t.integer "recruiter_id"
   end
 
   create_table "industries", :force => true do |t|
@@ -50,6 +45,7 @@ ActiveRecord::Schema.define(:version => 20120522160158) do
     t.integer  "reviews_count",               :default => 0, :null => false
     t.integer  "simple_reviews_count",        :default => 0, :null => false
     t.integer  "rexiews_count",               :default => 0, :null => false
+    t.datetime "rexiews_updated_at"
     t.integer  "twitter_reviews_count",       :default => 0, :null => false
     t.integer  "category_id"
     t.datetime "created_at"
@@ -65,11 +61,6 @@ ActiveRecord::Schema.define(:version => 20120522160158) do
     t.float    "value"
     t.boolean  "heavy",               :default => false, :null => false
     t.string   "type"
-    t.datetime "created_at"
-    t.datetime "updated_at"
-  end
-
-  create_table "recruiters", :force => true do |t|
     t.datetime "created_at"
     t.datetime "updated_at"
   end
@@ -183,5 +174,43 @@ ActiveRecord::Schema.define(:version => 20120522160158) do
   create_table "transactions", :force => true do |t|
     t.integer "person_id", :null => false
     t.integer "monetary_value", :null => false
+  end
+
+  create_table "soft_deletes", :force => true do |t|
+    t.integer "company_id", :null => false
+    t.timestamp "deleted_at"
+  end
+
+  #polymorphic
+  create_table "poly_images", :force => true do |t|
+    t.integer "imageable_id", :null => true
+    t.string "imageable_type", :null => true
+    t.string "url"
+  end
+
+  create_table "poly_employees", :force => true do |t|
+    t.string "name"
+    t.integer  "poly_images_count", :default => 0, :null => false
+    t.integer  "poly_images_count_dup", :default => 0, :null => false
+    t.integer  "special_poly_images_count", :default => 0, :null => false
+  end
+
+  create_table "poly_products", :primary_key => 'pp_pk_id', :force => true do |t|
+    t.string "brand_name"
+    t.integer  "poly_images_count", :default => 0, :null => false
+    t.integer  "poly_images_count_dup", :default => 0, :null => false
+    t.integer  "special_poly_images_count", :default => 0, :null => false
+  end
+
+  create_table "conversations", :force => true do |t|
+    t.integer "candidate_id"
+  end
+
+  create_table "candidates", :force => true do |t|
+  end
+
+  create_table "candidate_profiles", :force => true do |t|
+    t.integer "candidate_id"
+    t.integer "conversations_count", :default => 0, :null => false
   end
 end

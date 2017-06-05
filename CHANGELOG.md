@@ -1,3 +1,47 @@
+## 1.6.2 (April 26, 2017)
+
+Bugfixes;
+  - Restore compatibility with older Rails versions
+
+## 1.6.1 (April 26, 2017)
+
+Bugfixes:
+  - Fix `counter_culture_fix_counts` for a multi-level relation where an intermediate link is `has_one`, rather than `belongs_to`
+
+## 1.6.0 (April 24, 2017)
+
+Improvements:
+  - Keeps counts updated correctly when using the paranoia gem and restoring soft-deleted records
+
+## 1.5.1 (April 17, 2017)
+
+Bugfixes:
+  - Support for `nil` values in polymorphic relationships
+
+## 1.5.0 (March 21, 2017)
+
+New features:
+  - Support for counter caches on one-level polymorphic relationships
+
+## 1.4.0 (March 21, 2017)
+
+Improvements:
+  - Avoid Rails 5.1 deprecation warnings
+
+## 1.3.1 (February 23, 2017)
+
+Bugfixes:
+  - Removed requirement for Rails 5 added by mistake (in fact, this gem supports and tests Rails versions as far back as Rails 3.2 now)
+
+## 1.3.0 (February 21, 2017)
+Removed features:
+  - Removed support for `has_one`; this did not work properly. If you need this, consider adding the `counter_culture` call on the model with the `belongs_to` instead.
+
+## 1.2.0 (February 21, 2017)
+
+New features:
+  - Add support for custom timestamp column with `touch` option
+
 ## 1.1.1 (January 13, 2017)
 
 Bugfixes:
@@ -6,7 +50,7 @@ Bugfixes:
 ## 1.1.0 (December 23, 2016)
 
 Improvements:
-  - Support for has_one associations
+  - Support for `has_one` associations
 
 ## 1.0.0 (November 15, 2016)
 
