@@ -252,6 +252,25 @@ module CounterCulture
       relation_reflect(first_relation).foreign_type
     end
 
+    def previous_counter_cache_name_for(obj)
+      before, after = intended_changes(obj)
+      obj.attributes = before
+      result = counter_cache_name_for(obj)
+      obj.attributes = after
+      result
+    end
+
+    def intended_changes(obj)
+      before, after = {}, {}
+
+      changes_method = Rails.version >= '5.1.0' ? :saved_changes : :changes
+      obj.public_send(changes_method).each do |key, value|
+        before[key], after[key] = value
+      end
+
+      [before, after]
+    end
+
     def previous_model(obj)
       prev = obj.dup
 

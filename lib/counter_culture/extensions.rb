@@ -111,7 +111,7 @@ module CounterCulture
         self.class.after_commit_counter_cache.each do |counter|
           # figure out whether the applicable counter cache changed (this can happen
           # with dynamic column names)
-          counter_cache_name_was = counter.counter_cache_name_for(counter.previous_model(self))
+          counter_cache_name_was = counter.previous_counter_cache_name_for(self)
           counter_cache_name = counter.counter_cache_name_for(self)
 
           if counter.first_level_relation_changed?(self) ||
