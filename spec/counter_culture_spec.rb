@@ -34,7 +34,6 @@ describe "CounterCulture" do
     DatabaseCleaner.clean
   end
 
-
   it "should use relation foreign_key correctly" do
     post = AnotherPost.new
     comment = post.comments.build
@@ -1276,6 +1275,21 @@ describe "CounterCulture" do
   A_FEW = CI_TEST_RUN ? 50:  10
   A_BATCH = CI_TEST_RUN ? 100: 10
 
+  it "should support batch processing" do
+    # first, clean up
+    SimpleDependent.delete_all
+    SimpleMain.delete_all
+
+    expect_any_instance_of(CounterCulture::Reconciler::Reconciliation).to receive(:update_count_for_batch).exactly(MANY/A_BATCH).times
+
+    MANY.times do |i|
+      main = SimpleMain.create
+      3.times { main.simple_dependents.create }
+    end
+
+    SimpleDependent.counter_culture_fix_counts :batch_size => A_BATCH
+  end
+
   it "should correctly fix the counter caches with thousands of records" do
     # first, clean up
     SimpleDependent.delete_all
@@ -1630,6 +1644,7 @@ describe "CounterCulture" do
 
   describe "when using acts_as_paranoia" do
     it "works" do
+      skip("Unsupported in this version of Rails") if Rails.version < "4.2.0"
       company = Company.create!
       expect(company.soft_deletes_count).to eq(0)
       sd = SoftDelete.create!(company_id: company.id)
@@ -1820,6 +1835,46 @@ describe "CounterCulture" do
         expect {img1.update_attributes!(url: "normal url")}
           .to change { employee.reload.special_poly_images_count }.from(1).to(0)
       end
+    end
+  end
+
+  describe "with papertrail support", versioning: true do
+    it "creates a papertrail version when changed" do
+      if Rails.version > "4.0.0" && Rails.version < "4.1.0"
+        skip("Unsupported in this version of Rails")
+      end
+
+      user = User.create
+      product = Product.create
+
+      expect(product.reviews_count).to eq(0)
+      expect(product.versions.count).to eq(1)
+
+      user.reviews.create :user_id => user.id, :product_id => product.id, :approvals => 13
+
+      product.reload
+
+      expect(product.reviews_count).to eq(1)
+      expect(product.versions.count).to eq(2)
+    end
+
+    it "does not create a papertrail version when papertrail flag not set" do
+      if Rails.version > "4.0.0" && Rails.version < "4.1.0"
+        skip("Unsupported in this version of Rails")
+      end
+
+      user = User.create
+      product = Product.create
+
+      expect(user.reviews_count).to eq(0)
+      expect(user.versions.count).to eq(1)
+
+      user.reviews.create :user_id => user.id, :product_id => product.id, :approvals => 13
+
+      user.reload
+
+      expect(user.reviews_count).to eq(1)
+      expect(user.versions.count).to eq(1)
     end
   end
 end

@@ -3,6 +3,8 @@ require 'active_support/core_ext/module/attribute_accessors'
 
 module CounterCulture
   class Reconciler
+    ACTIVE_RECORD_VERSION = Gem.loaded_specs["activerecord"].version
+
     attr_reader :counter, :options, :changes
 
     delegate :model, :relation, :full_primary_key, :relation_reflect, :polymorphic?, :to => :counter
@@ -75,27 +77,19 @@ module CounterCulture
 
         # iterate over all the possible counter cache column names
         counter_column_names.each do |where, column_name|
-         # if the column name is nil, that means those records don't affect
-         # counts; we don't need to do anything in that case. but we allow
-         # specifying that condition regardless to make the syntax less
-         # confusing
-         next unless column_name
+          # if the column name is nil, that means those records don't affect
+          # counts; we don't need to do anything in that case. but we allow
+          # specifying that condition regardless to make the syntax less
+          # confusing
+          next unless column_name
+
+          relation_class_table_name = quote_table_name(relation_class.table_name)
 
           # select join column and count (from above) as well as cache column ('column_name') for later comparison
-          counts_query = scope.select("#{relation_class.table_name}.#{relation_class.primary_key}, #{relation_class.table_name}.#{relation_reflect(relation).association_primary_key(relation_class)}, #{count_select} AS count, #{relation_class.table_name}.#{column_name}")
+          counts_query = scope.select("#{relation_class_table_name}.#{relation_class.primary_key}, #{relation_class_table_name}.#{relation_reflect(relation).association_primary_key(relation_class)}, #{count_select} AS count, #{relation_class_table_name}.#{column_name}")
 
           # we need to join together tables until we get back to the table this class itself lives in
-          # conditions must also be applied to the join on which we are counting
-          join_clauses.each_with_index do |join, index|
-            if index == join_clauses.size - 1
-              if where
-                join += " AND (#{model.send(:sanitize_sql_for_conditions, where)})"
-              end
-              # respect the deleted_at column if it exists
-              if model.column_names.include?('deleted_at')
-                join += " AND #{model.table_name}.deleted_at IS NULL"
-              end
-            end
+          join_clauses(where).each do |join|
             counts_query = counts_query.joins(join)
           end
 
@@ -105,22 +99,26 @@ module CounterCulture
 
           counts_query.group(full_primary_key(relation_class)).find_in_batches(batch_size: batch_size) do |records|
             # now iterate over all the models and see whether their counts are right
-            ActiveRecord::Base.transaction do
-              records.each do |record|
-                count = record.read_attribute('count') || 0
-                next if record.read_attribute(column_name) == count
-
-                track_change(record, column_name, count)
-
-                # use update_all because it's faster and because a fixed counter-cache shouldn't update the timestamp
-                relation_class.where(relation_class.primary_key => record.send(relation_class.primary_key)).update_all(column_name => count)
-              end
-            end
+            update_count_for_batch(column_name, records)
           end
         end
       end
 
       private
+
+      def update_count_for_batch(column_name, records)
+        ActiveRecord::Base.transaction do
+          records.each do |record|
+            count = record.read_attribute('count') || 0
+            next if record.read_attribute(column_name) == count
+
+            track_change(record, column_name, count)
+
+            # use update_all because it's faster and because a fixed counter-cache shouldn't update the timestamp
+            relation_class.where(relation_class.primary_key => record.send(relation_class.primary_key)).update_all(column_name => count)
+          end
+        end
+      end
 
       # keep track of what we fixed, e.g. for a notification email
       def track_change(record, column_name, count)
@@ -144,16 +142,17 @@ module CounterCulture
       end
 
       def self_table_name
-        @self_table_name ||= if relation_class.table_name == model.table_name
-          "#{model.table_name}_#{model.table_name}"
-        else
-          model.table_name
+        return @self_table_name if @self_table_name
+
+        @self_table_name = parameterize(model.table_name)
+        if relation_class.table_name == model.table_name
+          @self_table_name = "#{@self_table_name}_#{@self_table_name}"
         end
+        @self_table_name = quote_table_name(@self_table_name)
+        @self_table_name
       end
 
-      def join_clauses
-        return @join_clauses if defined?(@join_clauses)
-
+      def join_clauses(where)
         # we need to work our way back from the end-point of the relation to
         # this class itself; make a list of arrays pointing to the
         # second-to-last, third-to-last, etc.
@@ -162,14 +161,15 @@ module CounterCulture
 
         # store joins in an array so that we can later apply column-specific
         # conditions
-        @join_clauses = reverse_relation.map do |cur_relation|
+        join_clauses = reverse_relation.each_with_index.map do |cur_relation, index|
           reflect = relation_reflect(cur_relation)
 
-          target_table_alias = target_table = reflect.active_record.table_name
-          if relation_class.table_name == target_table
+          target_table = quote_table_name(reflect.active_record.table_name)
+          target_table_alias = parameterize(target_table)
+          if relation_class.table_name == reflect.active_record.table_name
             # join with alias to avoid ambiguous table name in
             # self-referential models
-            target_table_alias += "_#{target_table}"
+            target_table_alias += "_#{target_table_alias}"
           end
 
           if polymorphic?
@@ -180,6 +180,7 @@ module CounterCulture
             association_primary_key = reflect.association_primary_key
             source_table = reflect.table_name
           end
+          source_table = quote_table_name(source_table)
 
           source_table_key = association_primary_key
           target_table_key = reflect.foreign_key
@@ -204,10 +205,34 @@ module CounterCulture
             # NB only works for one-level relations
             joins_sql += " AND #{target_table}.#{reflect.foreign_type} = '#{relation_class.name}'"
           end
+          if index == reverse_relation.size - 1
+            # conditions must be applied to the join on which we are counting
+            if where
+              joins_sql += " AND (#{model.send(:sanitize_sql_for_conditions, where)})"
+            end
+            # respect the deleted_at column if it exists
+            if model.column_names.include?('deleted_at')
+              joins_sql += " AND #{target_table_alias}.deleted_at IS NULL"
+            end
+          end
           joins_sql
         end
       end
 
+      # This is only needed in relatively unusal cases, for example if you are
+      # using Postgres with schema-namespaced tables. But then it's required,
+      # and otherwise it's just a no-op, so why not do it?
+      def quote_table_name(table_name)
+        relation_class.connection.quote_table_name(table_name)
+      end
+
+      def parameterize(string)
+        if ACTIVE_RECORD_VERSION < Gem::Version.new("5.0")
+          string.parameterize('_')
+        else
+          string.parameterize(separator: '_')
+        end
+      end
     end
   end
 end

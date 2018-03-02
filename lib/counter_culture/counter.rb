@@ -1,6 +1,7 @@
 module CounterCulture
   class Counter
     CONFIG_OPTIONS = [ :column_names, :counter_cache_name, :delta_column, :foreign_key_values, :touch, :delta_magnitude, :execute_after_commit ]
+    ACTIVE_RECORD_VERSION = Gem.loaded_specs["activerecord"].version
 
     attr_reader :model, :relation, *CONFIG_OPTIONS
 
@@ -15,6 +16,7 @@ module CounterCulture
       @touch = options.fetch(:touch, false)
       @delta_magnitude = options[:delta_magnitude] || 1
       @execute_after_commit = options.fetch(:execute_after_commit, false)
+      @with_papertrail = options.fetch(:with_papertrail, false)
     end
 
     # increments or decrements a counter cache
@@ -28,6 +30,7 @@ module CounterCulture
     #   :was => whether to get the current value or the old value of the
     #      first part of the relation
     #   :execute_after_commit => execute the column update outside of the transaction to avoid deadlocks
+    #   :with_papertrail => update the column via Papertrail touch_with_version method
     def change_counter_cache(obj, options)
       change_counter_column = options.fetch(:counter_column) { counter_cache_name_for(obj) }
 
@@ -64,6 +67,12 @@ module CounterCulture
 
           klass = relation_klass(relation, source: obj, was: options[:was])
           primary_key = relation_primary_key(relation, source: obj, was: options[:was])
+
+          if @with_papertrail
+            instance = klass.where(primary_key => id_to_change).first
+            instance.paper_trail.touch_with_version if instance
+          end
+
           klass.where(primary_key => id_to_change).update_all updates.join(', ')
         end
       end
@@ -189,7 +198,7 @@ module CounterCulture
     end
 
     def attribute_changed?(obj, attr)
-      if Rails.version >= "5.1.0"
+      if ACTIVE_RECORD_VERSION >= Gem::Version.new("5.1.0")
         obj.saved_changes[attr].present?
       else
         obj.send(:attribute_changed?, attr)
@@ -252,9 +261,9 @@ module CounterCulture
     def previous_model(obj)
       prev = obj.dup
 
-      changes_method = Rails.version >= "5.1.0" ? :saved_changes : :changed_attributes
+      changes_method = ACTIVE_RECORD_VERSION >= Gem::Version.new("5.1.0") ? :saved_changes : :changed_attributes
       obj.public_send(changes_method).each do |key, value|
-        old_value = Rails.version >= "5.1.0" ? value.first : value
+        old_value = ACTIVE_RECORD_VERSION >= Gem::Version.new("5.1.0") ? value.first : value
         prev.public_send("#{key}=", old_value)
       end
 
@@ -272,7 +281,7 @@ module CounterCulture
 
     def attribute_was(obj, attr)
       changes_method =
-        if Rails.version >= "5.1.0"
+        if ACTIVE_RECORD_VERSION >= Gem::Version.new("5.1.0")
           "_before_last_save"
         else
           "_was"

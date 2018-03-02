@@ -1,6 +1,38 @@
+## 1.9.1 (March 1, 2017)
+
+Bugfixes:
+  - Address an edge-case test regression caused by Rails 5.1.5 that was causing counts to be off when saving changes from an `after_create` callback
+
+## 1.9.0 (November 29, 2017)
+
+Improvements:
+  - Switch generated migration files to use new hash syntax
+  - Support for Rails 5 migration file format for generated migrations
+
+## 1.8.2 (September 27, 2017)
+
+Bugfixes:
+  - Actually use `batch_size` parameter in `counter_culture_fix_counts` (#200)
+
+## 1.8.1 (September 5, 2017)
+
+Improvements:
+  - Use ActiveRecord version, not Rails version, in `Reconciler`, makeing it possible to use `counter_culture_fix_counts` without Rails
+
+## 1.8.0 (August 30, 2017)
+
+Improvements:
+  - Quote all table names to work correctly with PostgreSQL schemata
+  - Use ActiveRecord version, not Rails version, to make things work for projects that use ActiveRecord but not Rails
+
+## 1.7.0 (June 12, 2017)
+
+Improvements:
+  - Support for creating `paper_trail` versions when counters change
+
 ## 1.6.2 (April 26, 2017)
 
-Bugfixes;
+Bugfixes:
   - Restore compatibility with older Rails versions
 
 ## 1.6.1 (April 26, 2017)

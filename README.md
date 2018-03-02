@@ -14,7 +14,7 @@ Tested against Ruby 2.2.5 and 2.3.1 and against the latest patch releases of Rai
 Add counter_culture to your Gemfile:
 
 ```ruby
-gem 'counter_culture', '~> 1.0'
+gem 'counter_culture', '~> 1.8'
 ```
 
 Then run `bundle install`
@@ -116,7 +116,7 @@ end
 ```ruby
 class Product < ActiveRecord::Base
   belongs_to :category
-  counter_culture :category, column_name: :weight, delta_magnitude: proc { model.product_type == 'awesome' ? 2 : 1 }
+  counter_culture :category, column_name: :weight, delta_magnitude: proc {|model| model.product_type == 'awesome' ? 2 : 1 }
 end
 
 class Category < ActiveRecord::Base
@@ -234,13 +234,13 @@ You will sometimes want to populate counter-cache values from primary data. This
 Product.counter_culture_fix_counts
 # will automatically fix counts for all counter caches defined on Product
 
-Product.counter_culture_fix_counts except: :category
+Product.counter_culture_fix_counts exclude: :category
 # will automatically fix counts for all counter caches defined on Product, except for the :category relation
 
 Product.counter_culture_fix_counts only: :category
 # will automatically fix counts only on the :category relation on Product
 
-# :except and :only also accept arrays of one level relations
+# :exclude and :only also accept arrays of one level relations
 # if you want to fix counts on a more than one level relation you need to use convention below:
 
 Product.counter_culture_fix_counts only: [[:subcategory, :category]]
